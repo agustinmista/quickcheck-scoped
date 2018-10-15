@@ -1,0 +1,6 @@
+*.ghci
+*.ho
+*.hi
+
+.stack-work
+
