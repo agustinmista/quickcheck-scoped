@@ -1,26 +1,27 @@
--- This file has been generated from package.yaml by hpack version 0.28.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8044239a247b94207bcaa8f2eff3ea4178880660e0c2e24579012da99277e58b
+-- hash: 2024820eadd8a093ed6f42cf6a584493584272ac8d32bc9c886afab26e3e4d15
 
 name:           quickcheck-scoped
 version:        0.1.0.0
-synopsis:       QuickCheck combinators for random generation of scope-sensitive data types.
+synopsis:       QuickCheck combinators for random generation of well-scoped data types.
 description:    Please see the README on GitHub at <https://github.com/agustinmista/quickcheck-scoped#readme>
 category:       Testing
 homepage:       https://github.com/agustinmista/quickcheck-scoped#readme
 bug-reports:    https://github.com/agustinmista/quickcheck-scoped/issues
 author:         Agustín Mista
 maintainer:     Agustín Mista
-copyright:      2018 Agustín Mista
+copyright:      2019 Agustín Mista
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
 extra-source-files:
-    ChangeLog.md
     README.md
+    ChangeLog.md
 
 source-repository head
   type: git
@@ -28,8 +29,9 @@ source-repository head
 
 library
   exposed-modules:
-      Test.QuickCheck.Scoped.Gen
-      Test.QuickCheck.Scoped.Arbitrary
+      Test.QuickCheck.Scoped
+      Test.QuickCheck.Scoped.ScopedGen
+      Test.QuickCheck.Scoped.ScopedArbitrary
   other-modules:
       Paths_quickcheck_scoped
   hs-source-dirs:
