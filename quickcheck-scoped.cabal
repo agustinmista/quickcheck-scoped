@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2024820eadd8a093ed6f42cf6a584493584272ac8d32bc9c886afab26e3e4d15
+-- hash: 5113006a16fc2a58697d81aaf1f8d649914494495f7040b0081db9cd425cfc4a
 
 name:           quickcheck-scoped
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
     , QuickCheck-GenT
     , base >=4.7 && <5
     , containers
+    , ghc
     , mtl
     , transformers
   default-language: Haskell2010

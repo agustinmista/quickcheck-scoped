@@ -12,7 +12,7 @@ extra-source-files:
 - ChangeLog.md
 
 # Metadata used when publishing your package
-synopsis:            QuickCheck combinators for random generation of well-scoped data types.  
+synopsis:            QuickCheck combinators for random generation of well-scoped data types.
 category:            Testing
 
 # To avoid duplicated efforts in documentation and dealing with the
@@ -25,7 +25,7 @@ dependencies:
 - base >= 4.7 && < 5
 
 library:
-  source-dirs: 
+  source-dirs:
     - src
   exposed-modules:
     - Test.QuickCheck.Scoped
@@ -37,5 +37,4 @@ library:
     - mtl
     - QuickCheck
     - QuickCheck-GenT
-
-
+    - ghc

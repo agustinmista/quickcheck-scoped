@@ -1,13 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module ScopedTest where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-
 import Test.QuickCheck.Scoped
-import Test.QuickCheck (Arbitrary)
-import qualified Test.QuickCheck as QC
 
 
 data T = A Int | B deriving Show
@@ -39,22 +38,23 @@ instance Show v => Show (Inst v) where
 
 
 genInst :: ScopedGen (Set Char) (Inst Char)
-genInst = buildGenWith externalFrequency
-  [
-    "def"   ==> Def   <$> elements ['a'..'z'] `altering` Set.insert
-  , "get"   ==> Get   <$> fromEnv elements
-  , "undef" ==> Undef <$> fromEnv elements    `altering` Set.delete
+genInst = buildGenWith labeledFrequency
+  [ #def :=
+      Def <$> elements ['a'..'z'] |- Set.insert
+  , #get :=
+      Get <$> fromEnv elements
+  , #undef :=
+      Undef <$> fromEnv elements |- Set.delete
   ]
-  [
-    "block" ==> \r -> Block <$> scoped (listOf1 r)
+  [ #block := \rec ->
+      Block <$> scoped (listOf1 rec)
   ]
-
 
 instFreq :: FreqMap
 instFreq = freqMap
-  [ ("def", 1)
-  , ("get", 3)
-  , ("block", 5)
+  [ #def   := 1
+  , #get   := 3
+  , #block := 2
   ]
 
 instance ScopedArbitrary (Inst Char) where
@@ -73,16 +73,20 @@ data Expr
 
 instance Show Expr where
   show (Var v) = [v]
-  show (App l r) = "(" ++ show l ++ ") (" ++ show r ++")"
+  show (App l r) = "(" ++ show l ++ ")(" ++ show r ++")"
   show (Lam v e) = "\\" ++ [v] ++ ". " ++ show e
 
 genExpr :: ScopedGen (Set Char) Expr
-genExpr = buildGenWith externalFrequency
+genExpr = buildGenWith labeledFrequency
   [
-    "var" ==> Var <$> fromEnv elements
+    #var :=
+      Var <$> fromEnv elements
   ]
   [
-    "app" ==> \r -> App <$> scoped r <*> scoped r
-  , "lam" ==> \r -> Lam <$> elements ['a' .. 'z'] `altering` Set.insert
-                        <*> scoped r
+    #app := \rec ->
+      App <$> scoped rec
+          <*> scoped rec
+  , #lam := \r ->
+      Lam <$> elements ['a' .. 'z'] |- Set.insert
+          <*> scoped r
   ]

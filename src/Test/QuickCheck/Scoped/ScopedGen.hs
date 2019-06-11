@@ -1,13 +1,18 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.QuickCheck.Scoped.ScopedGen
-  ( FreqMap
+  ( Label(Label)
+  , label
+  , FreqMap
   , MaxDepth
-  , Label
   , LabelMap
-  , ExtFreq
   , freqMap
   , ScopedGen
   , liftArbitrary
@@ -20,14 +25,14 @@ module Test.QuickCheck.Scoped.ScopedGen
   , depthLimit
   , freqOf
   , scoped
-  -- , restricting
   , altering
+  , (|-)
   , fromEnv
   , resized
   , smaller
-  , increaseLabel
-  , Labelable
-  , (==>)
+  , runLabeledGen
+  , FromLabeled
+  , Labeled((:=))
   , listOf
   , listOf1
   , vectorOf
@@ -36,14 +41,21 @@ module Test.QuickCheck.Scoped.ScopedGen
   , scopedVectorOf
   , oneOf
   , frequency
-  , externalFrequency
+  , labeledFrequency
   , Scoped
   , runScopedGen
   , runClosedGen
   , buildGenWith
   -- Re-export generation functions for MonadGen
   , QuickCheck.GenT.MonadGen (..)
+  -- Re-export some QuickCheck utilities
+  , QC.generate
   ) where
+
+import FastString
+import Data.Proxy
+import GHC.OverloadedLabels
+import GHC.TypeLits
 
 import Data.Foldable
 import Control.Arrow
@@ -58,13 +70,37 @@ import QuickCheck.GenT (MonadGen(..), elementsMay, growingElementsMay)
 import Test.QuickCheck (Arbitrary, Gen)
 import qualified Test.QuickCheck as QC
 
+
+----------------------------------------
+-- Labeled values
+
+newtype Label
+  = Label FastString
+  deriving (Eq, Ord)
+
+instance Show Label where
+  show (Label x) = '#' : unpackFS x
+
+label :: String -> Label
+label = Label . fsLit
+
+data Labeled l a
+  = l := a
+  deriving (Show, Functor)
+
+infix 2 :=
+
+getLabel :: Labeled l a -> l
+getLabel (l := _) = l
+
+getValue :: Labeled l a -> a
+getValue (_ := a) = a
+
 ----------------------------------------
 -- Generation configuration
 
-type Label    = String
-type ExtFreq  = String
 type MaxDepth = Int
-type FreqMap  = Map ExtFreq Int
+type FreqMap  = Map Label Int
 type LabelMap = Map Label Int
 
 data GenState env
@@ -75,8 +111,8 @@ data GenState env
     , genLabels   :: LabelMap
     } deriving Show
 
-freqMap :: [(ExtFreq, Int)] -> FreqMap
-freqMap = Map.fromList
+freqMap :: [Labeled Label Int] -> FreqMap
+freqMap = Map.fromList . map (\lbd -> (getLabel lbd, getValue lbd))
 
 ----------------------------------------
 -- Scoped generation monad
@@ -155,6 +191,11 @@ altering gen f = do
   modify (\st -> st { genEnv = f x (genEnv st) })
   return x
 
+(|-) :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
+(|-) = altering
+
+infix 5 |-
+
 -- | Pick a random element from the environment using a given generator
 fromEnv :: (env -> ScopedGen env a) -> ScopedGen env a
 fromEnv gen = getEnv >>= gen
@@ -178,23 +219,23 @@ smaller = resized (subtract 1)
 ----------------------------------------
 -- Label combinators
 
-increaseLabel :: Label -> ScopedGen env ()
-increaseLabel l = modify $ \st ->
-  st { genLabels = Map.insertWith (+) l 1 (genLabels st) }
+runLabeledGen :: Labeled Label (ScopedGen env a) -> ScopedGen env a
+runLabeledGen (l := gen) = do
+  let inc k = Map.insertWith (+) k 1
+  modify $ \st -> st { genLabels = inc l (genLabels st) }
+  gen
 
-class Labelable a where
-  label :: a -> Label -> a
+class FromLabeled l a where
+  unlabel  :: Labeled l a -> a
 
-instance Labelable (ScopedGen env a) where
-  label g l = increaseLabel l >> g
+instance FromLabeled Label (ScopedGen env a) where
+  unlabel lg = runLabeledGen lg
 
-instance Labelable (ScopedGen env a -> ScopedGen env a) where
-  label g l = \r -> g r `label` l
+instance FromLabeled Label (ScopedGen env a -> ScopedGen env a) where
+  unlabel  (l := g) = \r -> runLabeledGen (l := g r)
 
-(==>) :: Labelable b => Label -> b -> (Label, b)
-l ==> g = (l, g `label` l)
-
-infix 2 ==>
+instance KnownSymbol symbol => IsLabel symbol Label where
+  fromLabel = Label . fsLit $ symbolVal (Proxy @symbol)
 
 ----------------------------------------
 -- | QuickCheck's list generating combinators.
@@ -268,14 +309,14 @@ frequency xs0 = choose (1, sum (map fst xs0)) >>= pick 0 xs0
     pick _ _ _ = empty
     delete i xs = take i xs ++ drop (i+1) xs
 
--- | Picks a generator from a list of externalFrequency generators.
+-- | Picks a generator from a list of labeled generators.
 -- Generation frequencies can be later assigned from outside.
 -- In case of fail, retries recursively among the rest.
-externalFrequency :: [(ExtFreq, ScopedGen env a)] -> ScopedGen env a
-externalFrequency xs = do
-  let mkTuple (l, g) = do
-        f <- freqOf l
-        return (f, g)
+labeledFrequency :: [Labeled Label (ScopedGen env a)] -> ScopedGen env a
+labeledFrequency xs = do
+  let mkTuple lg = do
+        f <- freqOf (getLabel lg)
+        return (f, unlabel lg)
   freqGens <- mapM mkTuple xs
   frequency freqGens
 
