@@ -33,12 +33,12 @@ module Test.QuickCheck.Scoped.ScopedGen
   , runLabeledGen
   , FromLabeled
   , Labeled((:=))
+  -- , vectorOf
+  -- , listOf
+  -- , listOf1
+  , vectorOf
   , listOf
   , listOf1
-  , vectorOf
-  , scopedListOf
-  , scopedListOf1
-  , scopedVectorOf
   , oneOf
   , frequency
   , labeledFrequency
@@ -99,8 +99,10 @@ getValue (_ := a) = a
 ----------------------------------------
 -- Generation configuration
 
-type MaxDepth = Int
-type FreqMap  = Map Label Int
+type Freq     = Int
+type Depth    = Int
+type MaxDepth = Depth
+type FreqMap  = Map Label (Depth -> Freq)
 type LabelMap = Map Label Int
 
 data GenState env
@@ -109,9 +111,9 @@ data GenState env
     , genFreqMap  :: FreqMap
     , genMaxDepth :: MaxDepth
     , genLabels   :: LabelMap
-    } deriving Show
+    } --deriving Show
 
-freqMap :: [Labeled Label Int] -> FreqMap
+freqMap :: [Labeled Label (Depth -> Int)] -> FreqMap
 freqMap = Map.fromList . map (\lbd -> (getLabel lbd, getValue lbd))
 
 ----------------------------------------
@@ -171,7 +173,10 @@ depthLimit = (0==) <$> getMaxDepth
 
 -- | Get the external generation frequency of a given label
 freqOf :: Label -> ScopedGen env Int
-freqOf x = Map.findWithDefault 1 x <$> getFreqMap
+freqOf x = do
+  depth <- getMaxDepth
+  freq <- Map.findWithDefault (const 1) x <$> getFreqMap
+  return (freq depth)
 
 ----------------------------------------
 -- Scoping combinators
@@ -237,35 +242,35 @@ instance FromLabeled Label (ScopedGen env a -> ScopedGen env a) where
 instance KnownSymbol symbol => IsLabel symbol Label where
   fromLabel = Label . fsLit $ symbolVal (Proxy @symbol)
 
-----------------------------------------
--- | QuickCheck's list generating combinators.
+-- ----------------------------------------
+-- -- | QuickCheck's list generating combinators.
 
-vectorOf :: Int -> ScopedGen env a -> ScopedGen env [a]
-vectorOf n gen = go n
-  where
-    go 0 = return []
-    go k = do
-      v <- gen
-      vs <- go (k-1)
-      return (v : vs)
+-- vectorOf :: Int -> ScopedGen env a -> ScopedGen env [a]
+-- vectorOf n gen = go n
+--   where
+--     go 0 = return []
+--     go k = do
+--       v <- gen
+--       vs <- go (k-1)
+--       return (v : vs)
 
-listOf :: ScopedGen env a -> ScopedGen env [a]
-listOf gen = sized $ \n -> do
-  k <- choose (0, n)
-  vectorOf k gen
+-- listOf :: ScopedGen env a -> ScopedGen env [a]
+-- listOf gen = sized $ \n -> do
+--   k <- choose (0, n)
+--   vectorOf k gen
 
-listOf1 :: ScopedGen env a -> ScopedGen env [a]
-listOf1 gen = sized $ \n -> do
-  k <- choose (1, max 1 n)
-  vectorOf k gen
+-- listOf1 :: ScopedGen env a -> ScopedGen env [a]
+-- listOf1 gen = sized $ \n -> do
+--   k <- choose (1, max 1 n)
+--   vectorOf k gen
 
 ----------------------------------------
 -- | Scoped list combinators
 
 -- | Generation of "sequential" values, where scoping goes deeper from
 -- left to right
-scopedVectorOf :: Int -> ScopedGen env a -> ScopedGen env [a]
-scopedVectorOf n gen = go n
+vectorOf :: Int -> ScopedGen env a -> ScopedGen env [a]
+vectorOf n gen = go n
   where
     go 0 = return []
     go k = do
@@ -273,15 +278,17 @@ scopedVectorOf n gen = go n
       vs <- scoped (go (k-1))
       return (v : vs)
 
-scopedListOf :: ScopedGen env a -> ScopedGen env [a]
-scopedListOf gen = sized $ \n -> do
-  k <- choose (0, n)
-  scopedVectorOf k gen
+listOf :: ScopedGen env a -> ScopedGen env [a]
+listOf gen = do
+  d <- getMaxDepth
+  k <- choose (0, d)
+  vectorOf k gen
 
-scopedListOf1 :: ScopedGen env a -> ScopedGen env [a]
-scopedListOf1 gen = sized $ \n -> do
-  k <- choose (1, max 1 n)
-  scopedVectorOf k gen
+listOf1 :: ScopedGen env a -> ScopedGen env [a]
+listOf1 gen = do
+  d <- getMaxDepth
+  k <- choose (1, max 1 d)
+  vectorOf k gen
 
 ----------------------------------------
 -- | Random choice combinators with failure recovery

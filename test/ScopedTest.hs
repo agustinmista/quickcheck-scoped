@@ -52,9 +52,9 @@ genInst = buildGenWith labeledFrequency
 
 instFreq :: FreqMap
 instFreq = freqMap
-  [ #def   := 1
-  , #get   := 3
-  , #block := 2
+  [ #def   := const 1
+  , #get   := const 1
+  , #block := id
   ]
 
 instance ScopedArbitrary (Inst Char) where
