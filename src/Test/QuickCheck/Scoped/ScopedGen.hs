@@ -42,7 +42,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , oneOf
   , frequency
   , labeledFrequency
-  , Scoped
+  , Scoped(..)
   , runScopedGen
   , runClosedGen
   , buildGenWith
@@ -114,7 +114,8 @@ data GenState env
     } --deriving Show
 
 freqMap :: [Labeled Label (Depth -> Int)] -> FreqMap
-freqMap = Map.fromList . map (\lbd -> (getLabel lbd, getValue lbd))
+-- freqMap = Map.fromList . map (\lbd -> (getLabel lbd, getValue lbd))
+freqMap = Map.fromList . map (getLabel &&& getValue)
 
 ----------------------------------------
 -- Scoped generation monad
