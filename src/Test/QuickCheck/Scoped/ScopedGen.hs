@@ -50,6 +50,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , QuickCheck.GenT.MonadGen (..)
   -- Re-export some QuickCheck utilities
   , QC.generate
+  , QC.Arbitrary(..)
   ) where
 
 import FastString
