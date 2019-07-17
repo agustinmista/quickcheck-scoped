@@ -19,6 +19,8 @@ module Test.QuickCheck.Scoped.ScopedGen
   , elements
   , growingElements
   , getEnv
+  , setEnv
+  , updateEnv
   , getFreqMap
   , getMaxDepth
   , getLabels
@@ -33,9 +35,6 @@ module Test.QuickCheck.Scoped.ScopedGen
   , runLabeledGen
   , FromLabeled
   , Labeled((:=))
-  -- , vectorOf
-  -- , listOf
-  -- , listOf1
   , vectorOf
   , listOf
   , listOf1
@@ -44,7 +43,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , labeledFrequency
   , Scoped(..)
   , runScopedGen
-  , runClosedGen
+  , runScopedGen'
   , buildGenWith
   -- Re-export generation functions for MonadGen
   , QuickCheck.GenT.MonadGen (..)
@@ -112,10 +111,9 @@ data GenState env
     , genFreqMap  :: FreqMap
     , genMaxDepth :: MaxDepth
     , genLabels   :: LabelMap
-    } --deriving Show
+    } 
 
 freqMap :: [Labeled Label (Depth -> Int)] -> FreqMap
--- freqMap = Map.fromList . map (\lbd -> (getLabel lbd, getValue lbd))
 freqMap = Map.fromList . map (getLabel &&& getValue)
 
 ----------------------------------------
@@ -152,11 +150,17 @@ growingElements :: Foldable f => f a -> ScopedGen env a
 growingElements = growingElementsMay . toList >=> maybe empty pure
 
 ----------------------------------------
--- Generation state projections
+-- | Interaction with the generation state
 
--- | Get the current environment
+-- | Access directly to the generation environment
 getEnv :: ScopedGen env env
 getEnv = gets genEnv
+
+setEnv :: env -> ScopedGen env ()
+setEnv env = modify $ \st -> st { genEnv = env } 
+
+updateEnv :: (env -> env) -> ScopedGen env ()
+updateEnv f = modify $ \st -> st { genEnv = f (genEnv st) } 
 
 -- | Get the current recursion limit
 getMaxDepth :: ScopedGen env MaxDepth
@@ -188,14 +192,14 @@ scoped :: ScopedGen env a -> ScopedGen env a
 scoped gen = do
   env <- getEnv
   res <- gen
-  modify (\st -> st { genEnv = env })
+  setEnv env
   return res
 
 -- | Modify the current environment based on the output of a generator
 altering :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
 altering gen f = do
   x <- gen
-  modify (\st -> st { genEnv = f x (genEnv st) })
+  updateEnv (f x)
   return x
 
 (|-) :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
@@ -243,28 +247,6 @@ instance FromLabeled Label (ScopedGen env a -> ScopedGen env a) where
 
 instance KnownSymbol symbol => IsLabel symbol Label where
   fromLabel = Label . fsLit $ symbolVal (Proxy @symbol)
-
--- ----------------------------------------
--- -- | QuickCheck's list generating combinators.
-
--- vectorOf :: Int -> ScopedGen env a -> ScopedGen env [a]
--- vectorOf n gen = go n
---   where
---     go 0 = return []
---     go k = do
---       v <- gen
---       vs <- go (k-1)
---       return (v : vs)
-
--- listOf :: ScopedGen env a -> ScopedGen env [a]
--- listOf gen = sized $ \n -> do
---   k <- choose (0, n)
---   vectorOf k gen
-
--- listOf1 :: ScopedGen env a -> ScopedGen env [a]
--- listOf1 gen = sized $ \n -> do
---   k <- choose (1, max 1 n)
---   vectorOf k gen
 
 ----------------------------------------
 -- | Scoped list combinators
@@ -343,9 +325,16 @@ runScopedGen env freqs depth g = do
   ma <- runMaybeT (runStateT (unScopedGen g) (GenState env freqs depth mempty))
   return (fmap (Scoped *** genLabels) ma)
 
-runClosedGen :: Monoid env => FreqMap -> MaxDepth -> ScopedGen env a
-             -> Gen (Maybe (Scoped a, LabelMap))
-runClosedGen = runScopedGen mempty
+-- | Run the scoped generator with an initial context
+-- This version discards the generated labels map,
+-- and raises an exception if the generation process fails
+-- due to an empty initial environment. 
+-- It is safe in most cases, but be careful!
+runScopedGen' :: env -> FreqMap -> MaxDepth
+             -> ScopedGen env a -> Gen a
+runScopedGen' env freqs depth g = do
+  Just (Scoped val, _) <- runScopedGen env freqs depth g
+  return val
 
 ----------------------------------------
 -- | Generation patterns
