@@ -333,8 +333,13 @@ runScopedGen env freqs depth g = do
 runScopedGen' :: env -> FreqMap -> MaxDepth
              -> ScopedGen env a -> Gen a
 runScopedGen' env freqs depth g = do
-  Just (Scoped val, _) <- runScopedGen env freqs depth g
-  return val
+  ma <- runScopedGen env freqs depth g
+  case ma of 
+    Just (Scoped val, _) ->
+      return val
+    Nothing -> 
+      error $ "generation process failed!\n" 
+           <> "backtrack failed when using the provided environment"
 
 ----------------------------------------
 -- | Generation patterns
