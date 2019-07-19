@@ -18,6 +18,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , liftArbitrary
   , elements
   , growingElements
+  , suchThat
   , getEnv
   , setEnv
   , updateEnv
@@ -32,6 +33,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , fromEnv
   , resized
   , smaller
+  , bigger
   , runLabeledGen
   , FromLabeled
   , Labeled((:=))
@@ -149,6 +151,14 @@ elements = elementsMay . toList >=> maybe empty pure
 growingElements :: Foldable f => f a -> ScopedGen env a
 growingElements = growingElementsMay . toList >=> maybe empty pure
 
+suchThat :: ScopedGen env a -> (env -> a -> Bool) -> ScopedGen env a
+suchThat gen f = do
+  env <- getEnv
+  a <- gen
+  if f env a
+    then return a
+    else suchThat gen f 
+
 ----------------------------------------
 -- | Interaction with the generation state
 
@@ -226,6 +236,10 @@ resized f gen = do
 -- | Run a generator with a maximum depth of one less the that current one
 smaller :: ScopedGen env a -> ScopedGen env a
 smaller = resized (subtract 1)
+
+-- | Run a generator with a maximum depth of one more the that current one
+bigger :: ScopedGen env a -> ScopedGen env a
+bigger = resized (+1)
 
 ----------------------------------------
 -- Label combinators
