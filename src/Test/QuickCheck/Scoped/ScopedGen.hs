@@ -40,6 +40,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , vectorOf
   , listOf
   , listOf1
+  , genFail
   , oneOf
   , frequency
   , labeledFrequency
@@ -124,7 +125,7 @@ freqMap = Map.fromList . map (getLabel &&& getValue)
 
 -- It supports:
 -- * Scoping
--- * Backtracking
+-- * Failure and backtracking
 -- * Recursion limit
 -- * Externally defined generation frequencies
 -- * Tracking generated labels
@@ -291,6 +292,10 @@ listOf1 gen = do
 
 ----------------------------------------
 -- | Random choice combinators with failure recovery
+
+-- | Force the generator to backtrack on a diferent choice
+genFail :: ScopedGen env a
+genFail = empty
 
 -- | Picks a generator from a list of generators with uniform probability.
 -- In case of fail, retries recursively among the rest.
