@@ -47,6 +47,7 @@ module Test.QuickCheck.Scoped.ScopedGen
   , runScopedGen
   , runScopedGen'
   , buildGenWith
+  , buildGenWith'
   -- Re-export generation functions for MonadGen
   , QuickCheck.GenT.MonadGen (..)
   -- Re-export some QuickCheck utilities
@@ -361,9 +362,22 @@ runScopedGen' env freqs depth g = do
 buildGenWith :: Functor f
              => ([f (ScopedGen env a)] -> ScopedGen env a)
              -> [f (ScopedGen env a)]
-             -> [f (ScopedGen env a -> ScopedGen env a)]
+             -> [f (ScopedGen env a)]
              -> ScopedGen env a
 buildGenWith method terms recs = gen
+  where
+    gen = do
+      limit <- depthLimit
+      if limit
+        then method terms
+        else method (terms <> recs)
+
+buildGenWith' :: Functor f
+             => ([f (ScopedGen env a)] -> ScopedGen env a)
+             -> [f (ScopedGen env a)]
+             -> [f (ScopedGen env a -> ScopedGen env a)]
+             -> ScopedGen env a
+buildGenWith' method terms recs = gen
   where
     gen = do
       limit <- depthLimit
