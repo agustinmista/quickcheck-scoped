@@ -23,15 +23,16 @@ module Test.QuickCheck.Scoped.ScopedGen
   , suchThat
   , getEnv
   , setEnv
+  , alterEnv
   , updateEnv
   , getFreqMap
+  , setFreqMap
+  , freqOf
+  , alterFreq
   , getMaxDepth
   , getLabels
   , depthLimit
-  , freqOf
-  , alterFreq
   , scoped
-  , alterEnv
   , (|-)
   , fromEnv
   , resized
@@ -181,9 +182,12 @@ updateEnv f = modify $ \st -> st { genEnv = f (genEnv st) }
 
 -- | Generation frequencies
 
--- | Get the external generation frequencies
+-- | Access directly to the external generation frequencies
 getFreqMap :: ScopedGen env FreqMap
 getFreqMap = gets genFreqMap
+
+setFreqMap :: FreqMap -> ScopedGen env ()
+setFreqMap freqs = modify $ \st -> st { genFreqMap = freqs }
 
 -- | Get the external generation frequency of a given label
 -- Defaults to 1
