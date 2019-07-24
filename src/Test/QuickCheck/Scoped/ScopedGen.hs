@@ -10,11 +10,13 @@
 module Test.QuickCheck.Scoped.ScopedGen
   ( Label(Label)
   , label
+  , getLabel
+  , getValue
   , FreqMap
-  , MaxDepth
-  , LabelMap
   , freqMap
   , ScopedGen
+  , MaxDepth
+  , LabelMap
   , liftArbitrary
   , elements
   , growingElements
@@ -27,8 +29,9 @@ module Test.QuickCheck.Scoped.ScopedGen
   , getLabels
   , depthLimit
   , freqOf
+  , alterFreq
   , scoped
-  , altering
+  , alterEnv
   , (|-)
   , fromEnv
   , resized
@@ -164,6 +167,8 @@ suchThat gen f = do
 ----------------------------------------
 -- | Interaction with the generation state
 
+-- | Environment
+
 -- | Access directly to the generation environment
 getEnv :: ScopedGen env env
 getEnv = gets genEnv
@@ -174,27 +179,41 @@ setEnv env = modify $ \st -> st { genEnv = env }
 updateEnv :: (env -> env) -> ScopedGen env ()
 updateEnv f = modify $ \st -> st { genEnv = f (genEnv st) } 
 
--- | Get the current recursion limit
-getMaxDepth :: ScopedGen env MaxDepth
-getMaxDepth = gets genMaxDepth
+-- | Generation frequencies
 
 -- | Get the external generation frequencies
 getFreqMap :: ScopedGen env FreqMap
 getFreqMap = gets genFreqMap
 
-getLabels :: ScopedGen env LabelMap
-getLabels = gets genLabels
+-- | Get the external generation frequency of a given label
+-- Defaults to 1
+freqOf :: Label -> ScopedGen env Int
+freqOf lbl = do
+  depth <- getMaxDepth
+  freq <- Map.findWithDefault (const 1) lbl <$> getFreqMap
+  return (freq depth)
+
+-- | Alter the generation frequency of a given label
+alterFreq :: (Int -> Int) -> Label -> ScopedGen env ()
+alterFreq f lbl = do
+  modify $ \st -> st { genFreqMap = Map.alter (fmap (f .)) lbl (genFreqMap st) }
+
+-- | Recursion limit
+
+-- | Get the current recursion limit
+getMaxDepth :: ScopedGen env MaxDepth
+getMaxDepth = gets genMaxDepth
 
 -- | Check wether we reached the depth limit
 depthLimit :: ScopedGen env Bool
 depthLimit = (0==) <$> getMaxDepth
 
--- | Get the external generation frequency of a given label
-freqOf :: Label -> ScopedGen env Int
-freqOf x = do
-  depth <- getMaxDepth
-  freq <- Map.findWithDefault (const 1) x <$> getFreqMap
-  return (freq depth)
+-- | Generated labels
+
+-- | Get the generated labels count
+getLabels :: ScopedGen env LabelMap
+getLabels = gets genLabels
+
 
 ----------------------------------------
 -- Scoping combinators
@@ -208,14 +227,14 @@ scoped gen = do
   return res
 
 -- | Modify the current environment based on the output of a generator
-altering :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
-altering gen f = do
+alterEnv :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
+alterEnv gen f = do
   x <- gen
   updateEnv (f x)
   return x
 
 (|-) :: ScopedGen env a -> (a -> env -> env) -> ScopedGen env a
-(|-) = altering
+(|-) = alterEnv
 
 infix 5 |-
 
