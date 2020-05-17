@@ -46,8 +46,8 @@ genInst = buildGenWith labeledFrequency
   , #undef :=
       Undef <$> fromEnv elements |- Set.delete
   ]
-  [ #block := \rec ->
-      Block <$> scoped (listOf1 rec)
+  [ #block :=
+      Block <$> scoped (listOf1 (smaller genInst))
   ]
 
 instFreq :: FreqMap
@@ -83,10 +83,10 @@ genExpr = buildGenWith labeledFrequency
       Var <$> fromEnv elements
   ]
   [
-    #app := \rec ->
-      App <$> scoped rec
-          <*> scoped rec
-  , #lam := \r ->
+    #app :=
+      App <$> scoped (smaller genExpr)
+          <*> scoped (smaller genExpr)
+  , #lam :=
       Lam <$> elements ['a' .. 'z'] |- Set.insert
-          <*> scoped r
+          <*> scoped (smaller genExpr)
   ]
